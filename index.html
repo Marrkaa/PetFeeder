@@ -64,6 +64,17 @@
         margin: 20px 0;
       }
 
+      .warning-box {
+        background: #fff3cd;
+        border: 2px solid #ffc107;
+        padding: 15px;
+        border-radius: 10px;
+        margin: 20px 0;
+        text-align: center;
+        font-size: 1.1em;
+        color: #856404;
+      }
+
       .info-item {
         display: flex;
         justify-content: space-between;
@@ -175,6 +186,10 @@
         </div>
       </div>
 
+      <div id="warningBox" class="warning-box" style="display: none">
+        Kačiukas arti! Automatiškai pamaitins <15 cm
+      </div>
+
       <button id="feedBtn" class="feed-btn" onclick="feedCat()" disabled>
         PAMAITINTI KAČIUKĄ
       </button>
@@ -255,13 +270,13 @@
           // Prenumeruojam topicus
           client.subscribe(TOPIC_DISTANCE, (err) => {
             if (!err) {
-              addLog(`📡 Prenumeruota: ${TOPIC_DISTANCE}`);
+              addLog(`Prenumeruota: ${TOPIC_DISTANCE}`);
             }
           });
 
           client.subscribe(TOPIC_STATUS, (err) => {
             if (!err) {
-              addLog(`📡 Prenumeruota: ${TOPIC_STATUS}`);
+              addLog(`Prenumeruota: ${TOPIC_STATUS}`);
             }
           });
         });
@@ -270,11 +285,29 @@
           const msg = message.toString();
 
           if (topic === TOPIC_DISTANCE) {
+            const dist = parseFloat(msg);
             document.getElementById("distance").textContent = msg + " cm";
             addLog(`Atstumas: ${msg} cm`);
+
+            // Rodyti įspėjimą jei arti
+            const warningBox = document.getElementById("warningBox");
+            if (dist <= 15 && dist > 0) {
+              warningBox.style.display = "block";
+            } else {
+              warningBox.style.display = "none";
+            }
           } else if (topic === TOPIC_STATUS) {
             document.getElementById("esp-status").textContent = msg;
             addLog(`Statusas: ${msg}`);
+
+            // Jei pamaitintas - rodyti pranešimą
+            if (msg.includes("Pamaitintas")) {
+              if (msg.includes("Auto")) {
+                showMessage("Automatiškai pamaitintas!", "success");
+              } else {
+                showMessage("Pamaitintas per mygtuką!", "success");
+              }
+            }
           }
         });
 
@@ -298,7 +331,7 @@
           return;
         }
 
-        addLog("Siunčiama komanda FEED...");
+        addLog("🍖 Siunčiama komanda FEED...");
         client.publish(TOPIC_FEED, "FEED", { qos: 1 });
         showMessage("Kačiukas maitinamas!", "success");
       }
@@ -308,4 +341,3 @@
     </script>
   </body>
 </html>
-
