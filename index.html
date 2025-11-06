@@ -161,22 +161,22 @@
       <h1>🐱 Kačiuko Maitintuvas</h1>
 
       <div id="status" class="status disconnected">
-        🔴 Jungiamasi prie serverio...
+        Jungiamasi prie serverio...
       </div>
 
       <div class="info-box">
         <div class="info-item">
-          <span class="info-label">📏 Atstumas:</span>
+          <span class="info-label">Atstumas:</span>
           <span class="info-value" id="distance">-- cm</span>
         </div>
         <div class="info-item">
-          <span class="info-label">📡 Statusas:</span>
+          <span class="info-label">Statusas:</span>
           <span class="info-value" id="esp-status">Laukiama...</span>
         </div>
       </div>
 
       <button id="feedBtn" class="feed-btn" onclick="feedCat()" disabled>
-        🍖 PAMAITINTI KAČIUKĄ
+        PAMAITINTI KAČIUKĄ
       </button>
 
       <div id="message" class="message"></div>
@@ -227,11 +227,11 @@
 
         if (connected) {
           statusEl.className = "status connected";
-          statusEl.textContent = "🟢 Prisijungta!";
+          statusEl.textContent = "Prisijungta!";
           feedBtn.disabled = false;
         } else {
           statusEl.className = "status disconnected";
-          statusEl.textContent = "🔴 Atsijungta";
+          statusEl.textContent = "Atsijungta";
           feedBtn.disabled = true;
         }
       }
@@ -248,7 +248,7 @@
         });
 
         client.on("connect", () => {
-          addLog("✅ Prisijungta prie MQTT!");
+          addLog("Prisijungta prie MQTT!");
           isConnected = true;
           updateStatus(true);
 
@@ -271,21 +271,21 @@
 
           if (topic === TOPIC_DISTANCE) {
             document.getElementById("distance").textContent = msg + " cm";
-            addLog(`📏 Atstumas: ${msg} cm`);
+            addLog(`Atstumas: ${msg} cm`);
           } else if (topic === TOPIC_STATUS) {
             document.getElementById("esp-status").textContent = msg;
-            addLog(`📡 Statusas: ${msg}`);
+            addLog(`Statusas: ${msg}`);
           }
         });
 
         client.on("error", (err) => {
-          addLog(`❌ Klaida: ${err.message}`);
+          addLog(`Klaida: ${err.message}`);
           isConnected = false;
           updateStatus(false);
         });
 
         client.on("close", () => {
-          addLog("🔴 Atsijungta nuo MQTT");
+          addLog("Atsijungta nuo MQTT");
           isConnected = false;
           updateStatus(false);
         });
@@ -294,13 +294,13 @@
       // Maitinti kačiuką
       function feedCat() {
         if (!isConnected) {
-          showMessage("❌ Nėra ryšio su serveriu!", "error");
+          showMessage("Nėra ryšio su serveriu!", "error");
           return;
         }
 
-        addLog("🍖 Siunčiama komanda FEED...");
+        addLog("Siunčiama komanda FEED...");
         client.publish(TOPIC_FEED, "FEED", { qos: 1 });
-        showMessage("✅ Kačiukas maitinamas!", "success");
+        showMessage("Kačiukas maitinamas!", "success");
       }
 
       // Startas
@@ -308,3 +308,4 @@
     </script>
   </body>
 </html>
+
