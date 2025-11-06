@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="lt">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>🐱 Kačiuko Maitintuvas</title>
+    <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        min-height: 100vh;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        padding: 20px;
+      }
+
+      .container {
+        background: white;
+        border-radius: 20px;
+        padding: 40px;
+        max-width: 500px;
+        width: 100%;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+      }
+
+      h1 {
+        text-align: center;
+        color: #333;
+        margin-bottom: 10px;
+        font-size: 2.5em;
+      }
+
+      .status {
+        text-align: center;
+        padding: 15px;
+        border-radius: 10px;
+        margin: 20px 0;
+        font-size: 1.1em;
+        font-weight: bold;
+      }
+
+      .status.connected {
+        background: #4caf50;
+        color: white;
+      }
+
+      .status.disconnected {
+        background: #f44336;
+        color: white;
+      }
+
+      .info-box {
+        background: #f5f5f5;
+        padding: 20px;
+        border-radius: 10px;
+        margin: 20px 0;
+      }
+
+      .info-item {
+        display: flex;
+        justify-content: space-between;
+        margin: 10px 0;
+        font-size: 1.2em;
+      }
+
+      .info-label {
+        color: #666;
+      }
+
+      .info-value {
+        font-weight: bold;
+        color: #333;
+      }
+
+      .feed-btn {
+        width: 100%;
+        padding: 30px;
+        font-size: 2em;
+        border: none;
+        border-radius: 15px;
+        background: linear-gradient(135deg, #4caf50 0%, #45a049 100%);
+        color: white;
+        cursor: pointer;
+        transition: all 0.3s;
+        box-shadow: 0 8px 16px rgba(76, 175, 80, 0.3);
+        margin: 20px 0;
+      }
+
+      .feed-btn:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 12px 24px rgba(76, 175, 80, 0.4);
+      }
+
+      .feed-btn:active {
+        transform: translateY(-2px);
+      }
+
+      .feed-btn:disabled {
+        background: #ccc;
+        cursor: not-allowed;
+        transform: none;
+      }
+
+      .message {
+        text-align: center;
+        padding: 15px;
+        border-radius: 10px;
+        margin: 20px 0;
+        font-size: 1.1em;
+        display: none;
+      }
+
+      .message.success {
+        background: #4caf50;
+        color: white;
+        display: block;
+      }
+
+      .message.error {
+        background: #f44336;
+        color: white;
+        display: block;
+      }
+
+      .log {
+        background: #f9f9f9;
+        border: 1px solid #ddd;
+        border-radius: 10px;
+        padding: 15px;
+        max-height: 200px;
+        overflow-y: auto;
+        font-family: monospace;
+        font-size: 0.9em;
+        margin-top: 20px;
+      }
+
+      .log-item {
+        padding: 5px 0;
+        border-bottom: 1px solid #eee;
+      }
+
+      .log-item:last-child {
+        border-bottom: none;
+      }
+
+      .emoji {
+        font-size: 1.5em;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>🐱 Kačiuko Maitintuvas</h1>
+
+      <div id="status" class="status disconnected">
+        🔴 Jungiamasi prie serverio...
+      </div>
+
+      <div class="info-box">
+        <div class="info-item">
+          <span class="info-label">📏 Atstumas:</span>
+          <span class="info-value" id="distance">-- cm</span>
+        </div>
+        <div class="info-item">
+          <span class="info-label">📡 Statusas:</span>
+          <span class="info-value" id="esp-status">Laukiama...</span>
+        </div>
+      </div>
+
+      <button id="feedBtn" class="feed-btn" onclick="feedCat()" disabled>
+        🍖 PAMAITINTI KAČIUKĄ
+      </button>
+
+      <div id="message" class="message"></div>
+
+      <div class="log" id="log">
+        <div class="log-item">Laukiama prisijungimo...</div>
+      </div>
+    </div>
+
+    <script>
+      // MQTT nustatymai
+      const MQTT_BROKER = "wss://broker.hivemq.com:8884/mqtt";
+      const TOPIC_FEED = "kaciukas/feed";
+      const TOPIC_DISTANCE = "kaciukas/distance";
+      const TOPIC_STATUS = "kaciukas/status";
+
+      let client;
+      let isConnected = false;
+
+      // Logų funkcija
+      function addLog(message) {
+        const log = document.getElementById("log");
+        const item = document.createElement("div");
+        item.className = "log-item";
+        item.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+        log.insertBefore(item, log.firstChild);
+
+        // Ribojam iki 50 įrašų
+        while (log.children.length > 50) {
+          log.removeChild(log.lastChild);
+        }
+      }
+
+      // Rodyti pranešimą
+      function showMessage(text, type) {
+        const msg = document.getElementById("message");
+        msg.textContent = text;
+        msg.className = `message ${type}`;
+        setTimeout(() => {
+          msg.style.display = "none";
+        }, 3000);
+      }
+
+      // Atnaujinti statusą
+      function updateStatus(connected) {
+        const statusEl = document.getElementById("status");
+        const feedBtn = document.getElementById("feedBtn");
+
+        if (connected) {
+          statusEl.className = "status connected";
+          statusEl.textContent = "🟢 Prisijungta!";
+          feedBtn.disabled = false;
+        } else {
+          statusEl.className = "status disconnected";
+          statusEl.textContent = "🔴 Atsijungta";
+          feedBtn.disabled = true;
+        }
+      }
+
+      // Prisijungti prie MQTT
+      function connectMQTT() {
+        addLog("Jungiamasi prie MQTT brokerio...");
+
+        const clientId = "WebClient-" + Math.random().toString(16).substr(2, 8);
+        client = mqtt.connect(MQTT_BROKER, {
+          clientId: clientId,
+          clean: true,
+          reconnectPeriod: 5000,
+        });
+
+        client.on("connect", () => {
+          addLog("✅ Prisijungta prie MQTT!");
+          isConnected = true;
+          updateStatus(true);
+
+          // Prenumeruojam topicus
+          client.subscribe(TOPIC_DISTANCE, (err) => {
+            if (!err) {
+              addLog(`📡 Prenumeruota: ${TOPIC_DISTANCE}`);
+            }
+          });
+
+          client.subscribe(TOPIC_STATUS, (err) => {
+            if (!err) {
+              addLog(`📡 Prenumeruota: ${TOPIC_STATUS}`);
+            }
+          });
+        });
+
+        client.on("message", (topic, message) => {
+          const msg = message.toString();
+
+          if (topic === TOPIC_DISTANCE) {
+            document.getElementById("distance").textContent = msg + " cm";
+            addLog(`📏 Atstumas: ${msg} cm`);
+          } else if (topic === TOPIC_STATUS) {
+            document.getElementById("esp-status").textContent = msg;
+            addLog(`📡 Statusas: ${msg}`);
+          }
+        });
+
+        client.on("error", (err) => {
+          addLog(`❌ Klaida: ${err.message}`);
+          isConnected = false;
+          updateStatus(false);
+        });
+
+        client.on("close", () => {
+          addLog("🔴 Atsijungta nuo MQTT");
+          isConnected = false;
+          updateStatus(false);
+        });
+      }
+
+      // Maitinti kačiuką
+      function feedCat() {
+        if (!isConnected) {
+          showMessage("❌ Nėra ryšio su serveriu!", "error");
+          return;
+        }
+
+        addLog("🍖 Siunčiama komanda FEED...");
+        client.publish(TOPIC_FEED, "FEED", { qos: 1 });
+        showMessage("✅ Kačiukas maitinamas!", "success");
+      }
+
+      // Startas
+      connectMQTT();
+    </script>
+  </body>
+</html>
