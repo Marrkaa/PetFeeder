@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="lt">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Smart Pet Feeder</title>
+    <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        min-height: 100vh;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        padding: 20px;
+      }
+
+      .container {
+        background: white;
+        border-radius: 20px;
+        padding: 40px;
+        max-width: 500px;
+        width: 100%;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+      }
+
+      h1 {
+        text-align: center;
+        color: #333;
+        margin-bottom: 10px;
+        font-size: 2.5em;
+      }
+
+      .status {
+        text-align: center;
+        padding: 15px;
+        border-radius: 10px;
+        margin: 20px 0;
+        font-size: 1.1em;
+        font-weight: bold;
+      }
+
+      .status.connected {
+        background: #4caf50;
+        color: white;
+      }
+
+      .status.disconnected {
+        background: #f44336;
+        color: white;
+      }
+
+      .info-box {
+        background: #f5f5f5;
+        padding: 20px;
+        border-radius: 10px;
+        margin: 20px 0;
+      }
+
+      .warning-box {
+        background: #fff3cd;
+        border: 2px solid #ffc107;
+        padding: 15px;
+        border-radius: 10px;
+        margin: 20px 0;
+        text-align: center;
+        font-size: 1.1em;
+        color: #856404;
+      }
+
+      .info-item {
+        display: flex;
+        justify-content: space-between;
+        margin: 10px 0;
+        font-size: 1.2em;
+      }
+
+      .info-label {
+        color: #666;
+      }
+
+      .info-value {
+        font-weight: bold;
+        color: #333;
+      }
+
+      .mode-controls {
+        display: flex;
+        gap: 10px;
+        margin: 20px 0;
+      }
+
+      .mode-btn {
+        flex: 1;
+        padding: 15px;
+        border: none;
+        border-radius: 10px;
+        background: #e0e0e0;
+        cursor: pointer;
+        font-weight: bold;
+        transition: all 0.3s;
+        color: #555;
+      }
+
+      .mode-btn:hover {
+        background: #d0d0d0;
+      }
+
+      .mode-btn.active {
+        background: #667eea;
+        color: white;
+        box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+      }
+
+      .schedule-box {
+        margin: 20px 0;
+        padding: 15px;
+        background: #f0f4ff;
+        border-radius: 10px;
+        border: 1px solid #d0dfff;
+        display: none; /* Hidden by default, shown in SCHEDULE mode */
+      }
+
+      .schedule-input {
+        width: 100%;
+        padding: 10px;
+        margin-bottom: 10px;
+        border: 1px solid #ccc;
+        border-radius: 5px;
+        font-size: 1em;
+      }
+
+      .schedule-btn {
+        width: 100%;
+        padding: 10px;
+        background: #667eea;
+        color: white;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+      }
+
+      .feed-btn {
+        width: 100%;
+        padding: 30px;
+        font-size: 2em;
+        border: none;
+        border-radius: 15px;
+        background: linear-gradient(135deg, #4caf50 0%, #45a049 100%);
+        color: white;
+        cursor: pointer;
+        transition: all 0.3s;
+        box-shadow: 0 8px 16px rgba(76, 175, 80, 0.3);
+        margin: 20px 0;
+      }
+
+      .feed-btn:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 12px 24px rgba(76, 175, 80, 0.4);
+      }
+
+      .feed-btn:active {
+        transform: translateY(-2px);
+      }
+
+      .feed-btn:disabled {
+        background: #ccc;
+        cursor: not-allowed;
+        transform: none;
+        box-shadow: none;
+      }
+
+      .message {
+        text-align: center;
+        padding: 15px;
+        border-radius: 10px;
+        margin: 20px 0;
+        font-size: 1.1em;
+        display: none;
+      }
+
+      .message.success {
+        background: #4caf50;
+        color: white;
+        display: block;
+      }
+
+      .message.error {
+        background: #f44336;
+        color: white;
+        display: block;
+      }
+
+      .log {
+        background: #f9f9f9;
+        border: 1px solid #ddd;
+        border-radius: 10px;
+        padding: 15px;
+        max-height: 200px;
+        overflow-y: auto;
+        font-family: monospace;
+        font-size: 0.9em;
+        margin-top: 20px;
+      }
+
+      .log-item {
+        padding: 5px 0;
+        border-bottom: 1px solid #eee;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>Smart Pet Feeder</h1>
+
+      <div id="status" class="status disconnected">
+        Jungiamasi prie serverio...
+      </div>
+
+      <div class="info-box">
+        <div class="info-item">
+          <span class="info-label">Atstumas:</span>
+          <span class="info-value" id="distance">-- cm</span>
+        </div>
+        <div class="info-item">
+          <span class="info-label">Svoris:</span>
+          <span class="info-value" id="weight">-- g</span>
+        </div>
+        <div class="info-item">
+          <span class="info-label">Režimas:</span>
+          <span class="info-value" id="currentMode">--</span>
+        </div>
+        <div class="info-item">
+          <span class="info-label">Statusas:</span>
+          <span class="info-value" id="esp-status">Laukiama...</span>
+        </div>
+      </div>
+
+      <div class="mode-controls">
+        <button class="mode-btn" onclick="setMode('MANUAL')" id="btn-MANUAL">Rankinis</button>
+        <button class="mode-btn" onclick="setMode('AUTO')" id="btn-AUTO">Auto</button>
+        <button class="mode-btn" onclick="setMode('SCHEDULE')" id="btn-SCHEDULE">Grafikas</button>
+      </div>
+
+      <div id="scheduleBox" class="schedule-box">
+        <h3>Nustatyti grafiką</h3>
+        <p style="font-size: 0.9em; color: #666; margin-bottom: 5px;">Įveskite laikus atskirtus kableliais (pvz: 08:00,13:00,18:30)</p>
+        <input type="text" id="scheduleInput" class="schedule-input" placeholder="08:00,13:00,18:00" value="08:00,13:00,18:00">
+        <button class="schedule-btn" onclick="updateSchedule()">Išsaugoti Grafiką</button>
+      </div>
+
+      <div id="warningBox" class="warning-box" style="display: none">
+        Kačiukas arti!
+      </div>
+
+      <button id="feedBtn" class="feed-btn" onclick="feedCat()" disabled>
+        PAMAITINTI
+      </button>
+
+      <div id="message" class="message"></div>
+
+      <div class="log" id="log">
+        <div class="log-item">Laukiama prisijungimo...</div>
+      </div>
+    </div>
+
+    <script>
+      // MQTT nustatymai
+      const MQTT_BROKER = "wss://broker.hivemq.com:8884/mqtt";
+      const TOPIC_FEED = "kaciukas/feed";
+      const TOPIC_DISTANCE = "kaciukas/distance";
+      const TOPIC_WEIGHT = "kaciukas/weight";
+      const TOPIC_STATUS = "kaciukas/status";
+      const TOPIC_MODE = "kaciukas/mode";
+      const TOPIC_MODE_SET = "kaciukas/mode/set";
+      const TOPIC_SCHEDULE_SET = "kaciukas/schedule/set";
+
+      let client;
+      let isConnected = false;
+      let currentMode = "";
+
+      function addLog(message) {
+        const log = document.getElementById("log");
+        const item = document.createElement("div");
+        item.className = "log-item";
+        item.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+        
+        // Naujausios zinutes i apacia
+        log.appendChild(item);
+        
+        // Auto-scroll i apacia
+        log.scrollTop = log.scrollHeight;
+
+        // Ribojam iki 50 įrašų
+        while (log.children.length > 50) {
+          log.removeChild(log.firstChild); // Trinam seniausia (virsutini)
+        }
+      }
+
+      function showMessage(text, type) {
+        const msg = document.getElementById("message");
+        msg.textContent = text;
+        msg.className = `message ${type}`;
+        setTimeout(() => { msg.style.display = "none"; }, 3000);
+      }
+
+      function updateStatus(connected) {
+        const statusEl = document.getElementById("status");
+        const feedBtn = document.getElementById("feedBtn");
+        if (connected) {
+          statusEl.className = "status connected";
+          statusEl.textContent = "Prisijungta!";
+          feedBtn.disabled = false;
+        } else {
+          statusEl.className = "status disconnected";
+          statusEl.textContent = "Atsijungta";
+          feedBtn.disabled = true;
+        }
+      }
+
+      function setMode(mode) {
+        if (!isConnected) return;
+        client.publish(TOPIC_MODE_SET, mode, { qos: 1 });
+        addLog(`Keičiamas režimas į: ${mode}`);
+      }
+
+      function updateSchedule() {
+        if (!isConnected) return;
+        const scheduleStr = document.getElementById("scheduleInput").value;
+        client.publish(TOPIC_SCHEDULE_SET, scheduleStr, { qos: 1 });
+        addLog(`Siunčiamas grafikas: ${scheduleStr}`);
+        showMessage("Grafikas išsiųstas!", "success");
+      }
+
+      function updateModeUI(mode) {
+        currentMode = mode;
+        document.getElementById("currentMode").textContent = mode;
+        document.querySelectorAll('.mode-btn').forEach(btn => btn.classList.remove('active'));
+        const btn = document.getElementById('btn-' + mode);
+        if(btn) btn.classList.add('active');
+
+        // Show/Hide schedule box
+        const scheduleBox = document.getElementById("scheduleBox");
+        if (mode === "SCHEDULE") {
+          scheduleBox.style.display = "block";
+        } else {
+          scheduleBox.style.display = "none";
+        }
+      }
+
+      function connectMQTT() {
+        addLog("Jungiamasi prie MQTT brokerio...");
+        const clientId = "WebClient-" + Math.random().toString(16).substr(2, 8);
+        client = mqtt.connect(MQTT_BROKER, {
+          clientId: clientId,
+          clean: true,
+          reconnectPeriod: 5000,
+        });
+
+        client.on("connect", () => {
+          addLog("Prisijungta prie MQTT!");
+          isConnected = true;
+          updateStatus(true);
+
+          [TOPIC_DISTANCE, TOPIC_STATUS, TOPIC_WEIGHT, TOPIC_MODE].forEach(topic => {
+            client.subscribe(topic, (err) => {
+              if (!err) addLog(`Prenumeruota: ${topic}`);
+            });
+          });
+        });
+
+        client.on("message", (topic, message) => {
+          const msg = message.toString();
+
+          if (topic === TOPIC_DISTANCE) {
+            const dist = parseFloat(msg);
+            document.getElementById("distance").textContent = msg + " cm";
+            const warningBox = document.getElementById("warningBox");
+            if (dist <= 15 && dist > 0) {
+              warningBox.style.display = "block";
+              if(currentMode === "AUTO") warningBox.textContent = "Kačiukas arti! Maitinama...";
+              else warningBox.textContent = "Kačiukas arti!";
+            } else {
+              warningBox.style.display = "none";
+            }
+          } else if (topic === TOPIC_WEIGHT) {
+            document.getElementById("weight").textContent = msg + " g";
+          } else if (topic === TOPIC_MODE) {
+            updateModeUI(msg);
+            addLog(`Režimas: ${msg}`);
+          } else if (topic === TOPIC_STATUS) {
+            document.getElementById("esp-status").textContent = msg;
+            addLog(`Statusas: ${msg}`);
+            if (msg.includes("Maitinama")) {
+              showMessage("Kačiukas maitinamas!", "success");
+            } else if (msg.includes("Dubuo pilnas")) {
+              showMessage("Dubuo pilnas!", "error");
+            }
+          }
+        });
+
+        client.on("error", (err) => {
+          addLog(`Klaida: ${err.message}`);
+          isConnected = false;
+          updateStatus(false);
+        });
+
+        client.on("close", () => {
+          addLog("Atsijungta nuo MQTT");
+          isConnected = false;
+          updateStatus(false);
+        });
+      }
+
+      function feedCat() {
+        if (!isConnected) {
+          showMessage("Nėra ryšio su serveriu!", "error");
+          return;
+        }
+        addLog("Siunčiama komanda FEED...");
+        client.publish(TOPIC_FEED, "FEED", { qos: 1 });
+      }
+
+      connectMQTT();
+    </script>
+  </body>
+</html>
