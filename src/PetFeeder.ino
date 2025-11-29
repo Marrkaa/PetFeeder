@@ -8,8 +8,8 @@
 #include <vector>
 
 // --- KONFIGURACIJA ---
-const char* wifi_ssid = "TP-Link_C040";
-const char* wifi_password = "79065108";
+const char* wifi_ssid = "***";
+const char* wifi_password = "***";
 
 const char* mqtt_server = "broker.hivemq.com";
 const int mqtt_port = 1883;
