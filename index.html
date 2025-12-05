@@ -273,7 +273,10 @@
 
     <script>
       // MQTT nustatymai
-      const MQTT_BROKER = "wss://broker.hivemq.com:8884/mqtt";
+      // HiveMQ Cloud Secure WebSocket
+      const MQTT_BROKER = "wss://937f8b642c244e15af922b2031cf5852.s1.eu.hivemq.cloud:8884/mqtt";
+      const MQTT_USER = "admin";
+      const MQTT_PASSWORD = "Studentas123";
       const TOPIC_FEED = "kaciukas/feed";
       const TOPIC_DISTANCE = "kaciukas/distance";
       const TOPIC_WEIGHT = "kaciukas/weight";
@@ -362,6 +365,8 @@
           clientId: clientId,
           clean: true,
           reconnectPeriod: 5000,
+          username: MQTT_USER,
+          password: MQTT_PASSWORD,
         });
 
         client.on("connect", () => {
